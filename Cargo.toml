@@ -1,0 +1,12 @@
+[package]
+name = "abi-adapter"
+version = "0.1.0"
+description = "Mechanical slot-based ABI adapter for wasm boundaries"
+license = "..."                # TODO: license 待定
+edition = "2024"
+rust-version = "1.85"
+include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/examples/**", "/docs/**", "/LICENSE*", "/README.md"]
+
+[workspace]
+exclude = ["temp", "backup"]   # whole directories: frozen probes and history stay standalone
+resolver = "3"
