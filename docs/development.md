@@ -50,6 +50,23 @@ node scripts/check.cjs --toolchain 1.85.0 --compatibility
 
 `compile_fail` 只证明编译失败；`tests/compile.rs` 还检查错误原因并编译修正对照。wasm 验证器用明确的 `i32` 签名检查实际产物，本机 Rust 调用和 JavaScript 数值结果不能替代此检查。
 
+## 发布流程
+
+发布由 [release-plz](https://release-plz.dev/) 自动完成，见[工作流](../.github/workflows/release-plz.yml)与[配置](../release-plz.toml)。提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)，release-plz 据此确定版本号并生成 `CHANGELOG.md`。
+
+1. 推送到 `main` 后，工作流创建或更新发布 PR，内容为新版本号与变更日志。
+2. 审阅并合并发布 PR 后，工作流向 crates.io 发布，并创建 `v<version>` 标签与 GitHub Release。
+
+普通提交不会触发发布（`release_always = false`）。首个版本 0.1.0 同样经发布 PR 发布。
+
+首次启用前需完成：
+
+- 在 crates.io 创建 API 令牌（权限 `publish-new`、`publish-update`），保存为仓库 Secret `CARGO_REGISTRY_TOKEN`。
+- 在仓库 Settings → Actions → General 中启用 “Allow GitHub Actions to create and approve pull requests”。
+- 可选：默认令牌创建的 PR 不会触发 CI。如需在发布 PR 上运行检查，将具备 Contents 与 Pull requests 读写权限的 PAT 或 GitHub App 令牌保存为 Secret `RELEASE_PLZ_TOKEN`。
+
+crates.io 不允许用 Trusted Publishing 发布新 crate。首次发布后，可在 crates.io 为该 crate 配置 Trusted Publisher（仓库 `vhexl/abi-adapter`，工作流 `release-plz.yml`），再为 `release-plz-release` 任务添加 `id-token: write` 权限，并从工作流中完全移除 `CARGO_REGISTRY_TOKEN`。
+
 ## 文档维护
 
 README 保留接入示例与导航，使用指南集中常见用法和问题，Rustdoc 维护精确接口契约。架构文档独立说明结构、设计理由和关键约束，开发命令集中在本页。

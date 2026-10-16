@@ -1,5 +1,11 @@
 # abi-adapter
 
+[![CI](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/abi-adapter)](https://crates.io/crates/abi-adapter)
+[![docs.rs](https://img.shields.io/docsrs/abi-adapter)](https://docs.rs/abi-adapter)
+[![MSRV](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvhexl%2Fabi-adapter%2Fmain%2FCargo.toml&query=%24.package.rust-version&label=MSRV&color=blue)](Cargo.toml)
+[![License](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvhexl%2Fabi-adapter%2Fmain%2FCargo.toml&query=%24.package.license&label=license&color=blue)](#许可证)
+
 [English](README.md) | 简体中文
 
 为普通 Rust 函数生成 wasm 调用接口。`abi!` 按声明转换参数、调用目标函数，再转换返回值。
@@ -7,11 +13,16 @@
 
 ## 快速开始
 
-通过 Git 依赖引入：
+添加依赖：
 
-```toml
-[dependencies]
-abi-adapter = { git = "https://github.com/vhexl/abi-adapter" }
+```text
+cargo add abi-adapter
+```
+
+如需使用 `main` 分支尚未发布的改动，改为依赖 Git 仓库：
+
+```text
+cargo add abi-adapter --git https://github.com/vhexl/abi-adapter
 ```
 
 ```rust
@@ -40,7 +51,7 @@ fn main() {
 - [使用指南](docs/guide.md)：自定义转换、`ctx`、wasm 导出与常见问题。
 - [缓冲区示例](docs/buffers.md)：多槽结果与内存约定。
 - [架构设计](docs/architecture.md)：模块划分、执行流程与设计取舍。
-- [开发指南](docs/development.md)：检查、API 文档与维护约定。
+- [开发指南](docs/development.md)：检查、API 文档、发布与维护约定。
 
 ## 许可证
 
