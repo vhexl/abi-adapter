@@ -1,5 +1,7 @@
 // Run with: node --test tests/doc-buffer.cjs
 // Requires Rust 1.85+ and its installed wasm32-unknown-unknown target.
+// Compile the complete RET_BUF example from docs/buffers.md and check
+// that invalid addresses leave both the reserved and other buffers unchanged.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,7 +11,7 @@ const { execFileSync } = require('node:child_process');
 
 test('documented guest writes only its reserved buffer', () => {
   const root = path.resolve(__dirname, '..');
-  const document = fs.readFileSync(path.join(root, 'docs/architecture.md'), 'utf8');
+  const document = fs.readFileSync(path.join(root, 'docs/buffers.md'), 'utf8');
   const snippets = [...document.matchAll(/^```rust[^\r\n]*\r?\n([\s\S]*?)^```[ \t]*\r?$/gm)]
     .map((match) => match[1])
     .filter((source) => /\bstatic mut RET_BUF\b/.test(source));

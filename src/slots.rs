@@ -1,25 +1,69 @@
-//! The slot conversion traits (`docs/architecture.md` §3).
-//!
-//! The traits answer only one question: how does a value map to `N` 32-bit
-//! slots (and back). They do not imply a destination — a conversion is not a
-//! direct return, a buffer write, or an error channel.
+//! Fixed-width slot conversion traits. They do not select an output memory
+//! destination or provide an error return.
 
-/// Decode a value from exactly `N` 32-bit slots.
+/// Decode `Self` from exactly `N` slots.
 ///
-/// Implementations must handle any slot combination. There is no failure
-/// channel: implementations may panic, and the adapter does not catch or
-/// translate panics. A panic raised inside a `guest` wrapper cannot unwind
-/// across the `extern "C"` boundary and aborts the program instead; see the
-/// [`abi!`](crate::abi) documentation.
+/// [`abi!`](crate::abi) infers `Self` from the business parameter type and
+/// `N` from its bracketed slot group.
+///
+/// # Example
+///
+/// ```
+/// use abi_adapter::FromSlots;
+///
+/// #[derive(Debug, PartialEq)]
+/// struct Point { x: u32, y: u32 }
+///
+/// impl FromSlots<2> for Point {
+///     fn from_slots([x, y]: [u32; 2]) -> Self {
+///         Self { x, y }
+///     }
+/// }
+///
+/// assert_eq!(Point::from_slots([3, 5]), Point { x: 3, y: 5 });
+/// ```
+///
+/// # Contract
+///
+/// Implementations must remain memory-safe for every slot bit pattern.
+/// There is no error return; implementations may panic. The adapter does not
+/// catch panics, and a panic in a guest `extern "C"` wrapper terminates the
+/// program. See [`abi!`](crate::abi) for host and guest panic behavior.
+///
+/// Fallible validation can stay in the business function, with an agreed
+/// status value as its result.
 pub trait FromSlots<const N: usize>: Sized {
-    /// Decode `Self` from `slots`.
+    /// Decode `slots` in the agreed order.
     fn from_slots(slots: [u32; N]) -> Self;
 }
 
-/// Encode a value into exactly `N` 32-bit slots.
+/// Encode `Self` as exactly `N` slots.
 ///
-/// Same contract as [`FromSlots`]: no failure channel, no destination implied.
+/// # Example
+///
+/// ```
+/// use abi_adapter::IntoSlots;
+///
+/// struct Status(u32);
+///
+/// impl IntoSlots<1> for Status {
+///     fn into_slots(self) -> [u32; 1] {
+///         [self.0]
+///     }
+/// }
+///
+/// assert_eq!(Status(7).into_slots(), [7]);
+/// ```
+///
+/// # Return width
+///
+/// This trait supports arbitrary `N`, but [`abi!`](crate::abi) directly
+/// returns only zero or one slot. A `-> 0` declaration still invokes
+/// `IntoSlots<0>`, discards the empty array, and returns `()`.
+/// Larger results require a separate memory or resource protocol.
+///
+/// Panic behavior follows the contract of [`FromSlots`].
 pub trait IntoSlots<const N: usize>: Sized {
-    /// Encode `self` into `N` slots.
+    /// Encode `self` in the agreed slot order.
     fn into_slots(self) -> [u32; N];
 }

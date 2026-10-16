@@ -1,9 +1,8 @@
-//! Built-in slot conversions (`docs/architecture.md` §3): `()`, `u32`, `i32`,
-//! `f32`, and `[u32; N]`.
+//! Built-in slot conversions: `()`, `u32`, `i32`, `f32`, and `[u32; N]`.
 //!
-//! The set is deliberately closed. A blanket implementation would overlap
-//! with the concrete ones (E0119); consumers define their own wrapper types
-//! and implement the traits there.
+//! Use custom types for additional formats. Generic implementations may
+//! overlap these implementations (E0119). Representations are listed on the
+//! crate's main page.
 
 use crate::{FromSlots, IntoSlots};
 
@@ -30,7 +29,7 @@ impl IntoSlots<1> for u32 {
 }
 
 impl FromSlots<1> for i32 {
-    // Signed values travel as their raw 32-bit pattern.
+    // Preserve the signed integer's original 32 bits.
     fn from_slots(slots: [u32; 1]) -> Self {
         slots[0] as i32
     }
@@ -43,7 +42,7 @@ impl IntoSlots<1> for i32 {
 }
 
 impl FromSlots<1> for f32 {
-    // Floats travel as their bit pattern.
+    // Preserve floating-point bits without a numeric cast.
     fn from_slots(slots: [u32; 1]) -> Self {
         f32::from_bits(slots[0])
     }

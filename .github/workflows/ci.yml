@@ -1,0 +1,39 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Rust ${{ matrix.rust }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rust: stable
+            options: ''
+          - os: windows-latest
+            rust: stable
+            options: ''
+          - os: ubuntu-latest
+            rust: '1.85.0'
+            options: --compatibility
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Install Rust
+        run: rustup toolchain install ${{ matrix.rust }} --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+      - name: Run checks
+        run: node scripts/check.cjs --toolchain ${{ matrix.rust }} ${{ matrix.options }}

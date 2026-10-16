@@ -1,4 +1,4 @@
-//! Name-resolution and hygiene regressions for `abi!` expansion.
+//! Check that names in the calling code do not change `abi!` output.
 
 use abi_adapter::{FromSlots, IntoSlots};
 
@@ -10,7 +10,7 @@ pub fn slot_0(x: u32) -> u32 {
 abi_adapter::abi! { host pub fn slot_0_abi([x]) -> 1 => crate::slot_0; }
 
 // A slot parameter may carry the business function's name: the qualified
-// target path is unaffected by value-namespace bindings.
+// target path still selects the function, rather than the parameter.
 abi_adapter::abi! { host pub fn slot_named_abi([slot_0]) -> 1 => crate::slot_0; }
 
 #[test]
@@ -21,7 +21,7 @@ fn business_function_named_like_a_slot_still_resolves_through_its_path() {
 
 // Constants in scope leave the wrapper alone as long as no slot name matches:
 // a matching name would parse as a constant pattern (documented rejection,
-// E0005) because `macro_rules!` cannot give caller tokens hygiene.
+// E0005). The macro keeps the meaning of names supplied by its caller.
 #[allow(non_upper_case_globals)]
 mod constants_in_scope {
     pub const RATE: u32 = 11;
@@ -39,7 +39,8 @@ mod constants_in_scope {
     }
 }
 
-// The consumer can shadow `u32`; generated wire types must stay primitive.
+// User code can define its own `u32`; generated parameters must still use
+// Rust's built-in 32-bit type.
 #[allow(non_camel_case_types)]
 mod primitive_shadow {
     #[allow(dead_code)]

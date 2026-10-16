@@ -1,99 +1,24 @@
-//! The `abi!` boundary declaration macro (`docs/architecture.md` §4–§6).
-//!
-//! One declaration expands into exactly one wrapper function: decode each slot
-//! group through [`FromSlots`](crate::FromSlots), call the business function
-//! exactly once, and encode the result through [`IntoSlots`](crate::IntoSlots)
-//! at width 0 or 1. Decoded types come from the business signature and group
-//! widths from the number of listed slots, so the declaration repeats no
-//! business type; the expansion keeps no intermediate representation and emits
-//! no `unsafe` blocks. Guest exports still carry an unsafe `export_name`
-//! attribute whose symbol contract is the consumer's responsibility.
+//! Slot-based host wrappers and guest exports.
 
-/// Declares a host-side or guest-side ABI boundary function.
+/// Declare one host Rust wrapper or guest `extern "C"` export.
 ///
-/// # Forms
+/// # Example
 ///
-/// ```text
-/// abi! { host  #[attrs] VIS fn NAME([a, b], [c])         -> 0|1 => PATH; }
-/// abi! { host  #[attrs] VIS fn NAME(ctx CX: CTY; [a, b]) -> 0|1 => PATH; }
-/// abi! { host  #[attrs] VIS fn NAME(ctx CX: CTY;)        -> 0|1 => PATH; }
-/// abi! { guest("SYMBOL") #[attrs] VIS fn NAME([a, b])    -> 0|1 => PATH; }
+/// ```
+/// use abi_adapter::abi;
+///
+/// fn double(value: u32) -> u32 { value * 2 }
+///
+/// abi! { host pub fn double_abi([value]) -> 1 => crate::double; }
+///
+/// fn main() {
+///     assert_eq!(double_abi(21), 42);
+/// }
 /// ```
 ///
-/// - `host` expands to a plain Rust function for the host runtime to register
-///   as the implementation of a module import.
-/// - `guest` expands to a safe `extern "C"` function exported under the literal
-///   `SYMBOL` (`#[unsafe(export_name = ...)]`, edition 2024 syntax). The consumer
-///   must ensure the symbol does not conflict with another linked definition
-///   or a symbol expected by the runtime under a different signature. This is
-///   the safety obligation of `export_name`, even though calling the generated
-///   Rust function is safe. The
-///   `unsafe_code` lint does not inspect other crates' macro output, so this
-///   compiles under `#![forbid(unsafe_code)]`; adding `#[allow(unsafe_code)]`
-///   there is E0453.
-/// - Each bracketed list is one business parameter; every listed name becomes
-///   one `::core::primitive::u32` wrapper parameter. Group order is wire order
-///   and slot order.
-/// - Attributes and visibility apply to the wrapper function, not to the
-///   business function.
+/// # Common uses
 ///
-/// # Inference
-///
-/// The declaration never names a business type. For an argument of type `T` the
-/// expansion calls `FromSlots::from_slots([...])`, where `Self = T` is inferred
-/// from the business signature and the const parameter `N` from the length of
-/// the array literal. Return-position `impl IntoSlots<1>` and const-generic
-/// array parameters (`[u32; N]`) both infer successfully.
-///
-/// # Returns
-///
-/// The width must be the literal `0` or `1`: `0` runs `IntoSlots<0>` and
-/// discards the result; `1` returns the single encoded slot. Both directions
-/// have the same wire shape on both sides, so they pair directly. Larger
-/// results are a consumer protocol — declare an address or handle as an
-/// ordinary slot parameter and return a status word
-/// (`docs/architecture.md` §7).
-///
-/// # Context
-///
-/// `ctx` is host-side syntax only, must be the first parameter, and is passed
-/// through before the decoded arguments without slot conversion. Its type is
-/// copied verbatim, including elided lifetimes (`Ctx<'_>`).
-///
-/// # Panics
-///
-/// Decoding, the business call, and encoding all run inside the wrapper, and
-/// nothing is caught or translated. In a `host` wrapper a panic unwinds to the
-/// caller like any ordinary Rust panic. A `guest` wrapper is an `extern "C"`
-/// function, so a panic cannot unwind out of it: the program aborts (a trap on
-/// wasm), and whether values decoded so far are dropped first is unspecified.
-/// Handle failures inside the business function itself.
-///
-/// # Limitations
-///
-/// - `PATH` must be a qualified path such as `crate::business::score`; a bare
-///   name would be captured by a same-named slot parameter (E0618).
-///   The `<Type as Trait>::method` form does not match the macro's `path`
-///   fragment; use an unambiguous `Type::method` or a concrete thin wrapper.
-/// - An outer macro forwarding the return width must capture it as `tt`, not
-///   `literal` or `expr`: those fragments become opaque and cannot match the
-///   `0` / `1` rules after forwarding.
-/// - Slot names must be unique within one declaration (E0415), and a slot name
-///   must not collide with a constant (or unit struct or enum variant) in
-///   scope: the parameter would parse as a constant pattern (E0005), because
-///   `macro_rules!` cannot give caller-provided identifiers hygiene. Rename the
-///   slot or move the declaration to a scope without that item.
-/// - A generic business function needs an unambiguous target: write a turbofish
-///   specialization (`crate::generic::<u32>`) or a concrete thin wrapper.
-///   Parameter-position `impl Trait` is an anonymous generic and is equally
-///   ambiguous (E0283).
-/// - Group widths are checked against the business signature by the compiler,
-///   but a semantic swap between two same-width slots is not detectable
-///   (`docs/architecture.md` §10).
-///
-/// # Examples
-///
-/// A host boundary decoding a two-slot group and returning one slot:
+/// ## Custom argument group
 ///
 /// ```
 /// use abi_adapter::{abi, FromSlots};
@@ -117,7 +42,7 @@
 /// }
 /// ```
 ///
-/// A guest boundary with a versioned symbol and a zero-slot return:
+/// ## Guest export
 ///
 /// ```
 /// use abi_adapter::abi;
@@ -131,7 +56,7 @@
 /// }
 /// ```
 ///
-/// A host boundary with the runtime context passed through unconverted:
+/// ## Host context
 ///
 /// ```
 /// use abi_adapter::abi;
@@ -152,11 +77,107 @@
 /// }
 /// ```
 ///
-/// # Rejections
+/// # Declaration rules
 ///
-/// The group width and the business signature must agree:
+/// ```text
+/// abi! { host #[attrs] VIS fn NAME([a, b], [c])         -> R => PATH; }
+/// abi! { host #[attrs] VIS fn NAME(ctx CX: CTY; [a, b]) -> R => PATH; }
+/// abi! { host #[attrs] VIS fn NAME(ctx CX: CTY;)        -> R => PATH; }
+/// abi! { guest("SYMBOL") #[attrs] VIS fn NAME([a, b])   -> R => PATH; }
+/// ```
 ///
-/// ```compile_fail,E0277
+/// `R` must be the literal `0` or `1`. Attributes and visibility apply only
+/// to the generated wrapper. No-argument functions use `fn name()`; context-only
+/// host functions use `fn name(ctx cx: Ctx;)`.
+///
+/// ## Slots and type inference
+///
+/// - Each nonempty bracketed group maps to one business argument.
+///   Names become `::core::primitive::u32` parameters in written order.
+/// - Each group calls [`FromSlots::from_slots`](crate::FromSlots::from_slots).
+///   The business signature determines `Self`; the group size determines `N`.
+/// - Const-generic `[u32; N]` arguments and `impl IntoSlots<1>` results are supported.
+///
+/// A successful call decodes arguments from left to right, calls the business
+/// function once, then encodes its result. Each conversion runs once.
+/// A panic stops later steps.
+///
+/// ## Return values
+///
+/// | Declaration | Required business result trait | Wrapper result |
+/// | --- | --- | --- |
+/// | `-> 0` | [`IntoSlots<0>`](crate::IntoSlots) | `()` |
+/// | `-> 1` | [`IntoSlots<1>`](crate::IntoSlots) | `u32` |
+///
+/// `-> 0` still invokes result conversion before discarding the empty array.
+/// Host and guest wrappers use the same slot rules. Larger results need a
+/// separate memory or resource protocol; see `docs/buffers.md` in the repository.
+/// The crate does not access result memory or manage resources.
+///
+/// ## ctx
+///
+/// `ctx` is host-only, precedes all slot groups, and ends with a semicolon.
+/// It passes unchanged as the first business argument. Its type is used
+/// verbatim, including lifetimes such as `Ctx<'_>`.
+///
+/// # Export safety and panics
+///
+/// `guest("SYMBOL")` generates a safe `extern "C"` function carrying
+/// `#[unsafe(export_name = ...)]`. The export name must be a string literal.
+/// Users must ensure it does not conflict with another linked definition,
+/// especially a runtime function with a different signature. Callers must
+/// use the generated parameter and result types. These `export_name`
+/// obligations apply even though calling the Rust wrapper requires no `unsafe`.
+///
+/// The current Rust compiler's `unsafe_code` lint does not report these
+/// attributes from another crate's macro. Guest declarations therefore work
+/// under `#![forbid(unsafe_code)]`. Adding `#[allow(unsafe_code)]` conflicts
+/// with `forbid` (E0453).
+///
+/// Panics from decoding, the business call, and encoding are not caught or
+/// converted to error codes. Host wrappers follow the configured Rust panic
+/// strategy: unwind to the caller or terminate with `panic = "abort"`.
+///
+/// A guest `extern "C"` wrapper cannot unwind outwards: a panic terminates the
+/// program (a Wasm trap). Cleanup of previously decoded values is not guaranteed.
+/// Handle expected errors in the business function with an agreed result.
+///
+/// # Limitations
+///
+/// ## Paths and names
+///
+/// Use a qualified target such as `crate::business::score`. A short name can be
+/// hidden by a same-named slot parameter (E0618). `<Type as Trait>::method` is
+/// not accepted by the macro's path syntax; use an unambiguous `Type::method`
+/// or a concrete forwarding function.
+///
+/// Slot names must be unique (E0415) and must not match visible constants,
+/// unit structs such as `struct X;`, or fieldless enum variants. Such names
+/// may be parsed as constant patterns (E0005); rename the slot or move the
+/// declaration to a different scope. Caller-provided names retain their scope.
+///
+/// Slot counts are checked against business types. Swapped slots of the same
+/// type require protocol tests to detect.
+///
+/// ## Generic functions
+///
+/// Specify unresolved generics, for example `crate::generic::<u32>`, or use a
+/// concrete forwarding function. Argument-position `impl Trait` can be
+/// similarly ambiguous (E0283).
+///
+/// ## Forwarding return widths
+///
+/// An outer macro must capture the return width as `$width:tt`. Capturing it
+/// as `literal` or `expr` prevents matching it against the inner `0` / `1` rules.
+/// See `docs/guide.md` for common problems and fixes.
+///
+/// # Examples that do not compile
+///
+/// ## Argument width mismatch
+///
+/// `u32` requires one input slot:
+///
+/// ```compile_fail
 /// use abi_adapter::abi;
 ///
 /// fn echo(value: u32) -> u32 { value }
@@ -166,9 +187,11 @@
 /// fn main() {}
 /// ```
 ///
-/// A generic business function needs an unambiguous target:
+/// ## Unresolved generics
 ///
-/// ```compile_fail,E0283
+/// Use `crate::echo::<u32>` or a concrete forwarding function:
+///
+/// ```compile_fail
 /// use abi_adapter::{abi, IntoSlots};
 ///
 /// fn echo<T: IntoSlots<1>>(value: T) -> T { value }
@@ -178,9 +201,9 @@
 /// fn main() {}
 /// ```
 ///
-/// Parameter-position `impl Trait` is an anonymous generic:
+/// Argument-position `impl Trait` also requires a concrete type:
 ///
-/// ```compile_fail,E0283
+/// ```compile_fail
 /// use abi_adapter::{abi, IntoSlots};
 ///
 /// fn echo(value: impl IntoSlots<1>) -> u32 { value.into_slots()[0] }
@@ -190,7 +213,7 @@
 /// fn main() {}
 /// ```
 ///
-/// Direct returns are limited to zero or one slot:
+/// ## Unsupported return width
 ///
 /// ```compile_fail
 /// use abi_adapter::abi;
@@ -202,7 +225,9 @@
 /// fn main() {}
 /// ```
 ///
-/// `ctx` is host-side syntax; guest declarations do not accept it:
+/// ## Guest context
+///
+/// Use `host` for `ctx`:
 ///
 /// ```compile_fail
 /// use abi_adapter::abi;
@@ -214,9 +239,11 @@
 /// fn main() {}
 /// ```
 ///
-/// A bare target path is captured by a same-named slot parameter:
+/// ## Paths and names
 ///
-/// ```compile_fail,E0618
+/// Qualify the target as `crate::echo`:
+///
+/// ```compile_fail
 /// use abi_adapter::abi;
 ///
 /// fn echo(value: u32) -> u32 { value }
@@ -226,9 +253,9 @@
 /// fn main() {}
 /// ```
 ///
-/// Slot names must be unique within one wrapper:
+/// Use distinct slot names:
 ///
-/// ```compile_fail,E0415
+/// ```compile_fail
 /// use abi_adapter::abi;
 ///
 /// fn sum(a: u32, b: u32) -> u32 { a + b }
@@ -238,9 +265,9 @@
 /// fn main() {}
 /// ```
 ///
-/// A slot name matching a constant in scope parses as a constant pattern:
+/// Avoid visible constants as slot names:
 ///
-/// ```compile_fail,E0005
+/// ```compile_fail
 /// use abi_adapter::abi;
 ///
 /// const x: u32 = 1;
@@ -252,24 +279,27 @@
 /// fn main() {}
 /// ```
 ///
-/// Input and output conversions must exist for the declared width:
+/// ## Missing conversions
 ///
-/// ```compile_fail,E0277
+/// `bool` has no built-in slot conversions:
+///
+/// ```compile_fail
 /// use abi_adapter::abi;
 /// fn business(value: bool) -> u32 { u32::from(value) }
 /// abi! { host fn wrong([x]) -> 1 => crate::business; }
 /// fn main() {}
 /// ```
 ///
-/// ```compile_fail,E0277
+/// ```compile_fail
 /// use abi_adapter::abi;
 /// fn business() -> bool { true }
 /// abi! { host fn wrong() -> 1 => crate::business; }
 /// fn main() {}
 /// ```
 ///
-/// Empty slot groups are rejected; a zero-argument business function needs no
-/// group at all:
+/// ## Empty argument group
+///
+/// A function with no arguments uses `fn name()`:
 ///
 /// ```compile_fail
 /// use abi_adapter::abi;
@@ -278,8 +308,9 @@
 /// fn main() {}
 /// ```
 ///
-/// Boundary declarations require an explicit return width and are synchronous
-/// safe functions:
+/// ## Missing return width or unsupported modifiers
+///
+/// The return width is required; wrappers accept neither `async` nor `unsafe fn`:
 ///
 /// ```compile_fail
 /// use abi_adapter::abi;
@@ -304,17 +335,11 @@
 #[macro_export]
 macro_rules! abi {
     (host $(#[$attr:meta])* $vis:vis fn $name:ident(
+        $(ctx $ctx:ident : $ctx_ty:ty;)?
         $( [$($slot:ident),+] ),* $(,)?
     ) -> $ret:tt => $target:path;) => {
         $crate::abi!(@emit [$(#[$attr])*] [] $vis fn $name
-            [] [$( [$($slot),+] ),*] -> $ret => $target);
-    };
-    (host $(#[$attr:meta])* $vis:vis fn $name:ident(
-        ctx $ctx:ident : $ctx_ty:ty;
-        $( [$($slot:ident),+] ),* $(,)?
-    ) -> $ret:tt => $target:path;) => {
-        $crate::abi!(@emit [$(#[$attr])*] [] $vis fn $name
-            [$ctx : $ctx_ty] [$( [$($slot),+] ),*] -> $ret => $target);
+            [$($ctx : $ctx_ty)?] [$( [$($slot),+] ),*] -> $ret => $target);
     };
     (guest($symbol:literal) $(#[$attr:meta])* $vis:vis fn $name:ident(
         $( [$($slot:ident),+] ),* $(,)?
@@ -322,6 +347,48 @@ macro_rules! abi {
         $crate::abi!(@emit [#[unsafe(export_name = $symbol)] $(#[$attr])*]
             [extern "C"] $vis fn $name
             [] [$( [$($slot),+] ),*] -> $ret => $target);
+    };
+    // These fallback rules only match after the supported forms above fail.
+    // Keep errors inside an attributed function so cfg/cfg_attr can remove it.
+    (host $(#[$attr:meta])* $vis:vis fn $name:ident(
+        $(ctx $ctx:ident : $ctx_ty:ty;)?
+        $( [$($slot:ident),*] ),* $(,)?
+    ) -> $ret:tt => $target:path;) => {
+        $crate::abi!(@error [$(#[$attr])*] [] $vis fn $name
+            "ABI slot groups cannot be empty; list at least one slot in each group, or omit all groups for a function with no arguments");
+    };
+    (guest($symbol:literal) $(#[$attr:meta])* $vis:vis fn $name:ident(
+        $( [$($slot:ident),*] ),* $(,)?
+    ) -> $ret:tt => $target:path;) => {
+        $crate::abi!(@error [#[unsafe(export_name = $symbol)] $(#[$attr])*]
+            [extern "C"] $vis fn $name
+            "ABI slot groups cannot be empty; list at least one slot in each group, or omit all groups for a function with no arguments");
+    };
+    (guest($symbol:literal) $(#[$attr:meta])* $vis:vis fn $name:ident(
+        ctx $($args:tt)*
+    ) -> $ret:tt => $target:path;) => {
+        $crate::abi!(@error [#[unsafe(export_name = $symbol)] $(#[$attr])*]
+            [extern "C"] $vis fn $name
+            "ABI guest functions do not accept ctx; use host for a context parameter, or remove ctx from the guest declaration");
+    };
+    (host $(#[$attr:meta])* $vis:vis fn $name:ident(
+        $($args:tt)*
+    ) => $target:path;) => {
+        $crate::abi!(@error [$(#[$attr])*] [] $vis fn $name
+            "ABI return width is missing; add -> 0 or -> 1 before =>");
+    };
+    (guest($symbol:literal) $(#[$attr:meta])* $vis:vis fn $name:ident(
+        $($args:tt)*
+    ) => $target:path;) => {
+        $crate::abi!(@error [#[unsafe(export_name = $symbol)] $(#[$attr])*]
+            [extern "C"] $vis fn $name
+            "ABI return width is missing; add -> 0 or -> 1 before =>");
+    };
+    (@error [$($attrs:tt)*] [$($abi:tt)*] $vis:vis fn $name:ident $message:literal) => {
+        $($attrs)*
+        $vis $($abi)* fn $name() {
+            ::core::compile_error!($message);
+        }
     };
     (@emit [$($attrs:tt)*] [$($abi:tt)*] $vis:vis fn $name:ident
         [$($ctx:ident : $ctx_ty:ty)?]
@@ -341,12 +408,15 @@ macro_rules! abi {
     };
     (@return 0) => { () };
     (@return 1) => { ::core::primitive::u32 };
-    (@return $other:tt) => { ::core::compile_error!("ABI returns must be 0 or 1 slots") };
+    // Report an unsupported width once, from @encode in the function body.
+    (@return $other:tt) => { () };
     (@encode 0; $value:expr) => {{
         let _: [::core::primitive::u32; 0] = $crate::IntoSlots::<0>::into_slots($value);
     }};
     (@encode 1; $value:expr) => {
         $crate::IntoSlots::<1>::into_slots($value)[0]
     };
-    (@encode $other:tt; $value:expr) => { ::core::compile_error!("ABI returns must be 0 or 1 slots") };
+    (@encode $other:tt; $value:expr) => {
+        ::core::compile_error!("ABI returns must be 0 or 1 slots; use -> 0 or -> 1")
+    };
 }

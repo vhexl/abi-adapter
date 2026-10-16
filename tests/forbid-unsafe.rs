@@ -1,5 +1,5 @@
-//! The `unsafe_code` lint contract for `guest` declarations
-//! (`docs/architecture.md` §4.5, §9).
+//! Check that `guest` declarations compile with `#![forbid(unsafe_code)]`.
+//! See the export-safety discussion in `docs/architecture.md`.
 //!
 //! A `guest` declaration expands to a safe `extern "C"` function carrying
 //! `#[unsafe(export_name = ...)]`. That attribute trips the `unsafe_code` lint
@@ -8,12 +8,12 @@
 //! crate-level `forbid` compiles as-is. Do not add `#[allow(unsafe_code)]`
 //! here: under `forbid` that is E0453.
 //!
-//! This file doubles as the canary for the behavior: if a future toolchain
-//! starts linting external-macro output, compilation fails and the docs must
-//! be revisited.
+//! If a future compiler starts checking another crate's macro output,
+//! this test will fail and the documentation must be updated. This behavior
+//! belongs to the current compiler implementation, not a language guarantee.
 //!
-//! Passing this lint does not prove export safety: the consumer still owns
-//! the global symbol and ABI obligations documented by `abi!`.
+//! Passing the lint does not prove export safety: users must still choose a
+//! unique export name and use the matching call signature documented by `abi!`.
 
 #![forbid(unsafe_code)]
 

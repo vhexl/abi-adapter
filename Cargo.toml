@@ -2,10 +2,12 @@
 name = "abi-adapter"
 version = "0.1.0"
 description = "Mechanical slot-based ABI adapter for wasm boundaries"
-license = "..."                # TODO: license 待定
+license = "MIT OR Apache-2.0"
 edition = "2024"
 rust-version = "1.85"
-include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/examples/**", "/docs/**", "/LICENSE*", "/README.md"]
+repository = "https://github.com/vhexl/abi-adapter"
+readme = "README.md"
+include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/examples/**", "/docs/**", "/scripts/**", "/LICENSE*", "/README.md", "/README.zh-CN.md"]
 
 [workspace]
 exclude = ["temp", "backup"]   # whole directories: frozen probes and history stay standalone
