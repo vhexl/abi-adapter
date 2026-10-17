@@ -60,11 +60,29 @@ The following guides are in Chinese:
 
 ## Development
 
-`node scripts/check.cjs` runs the full local check: formatting, Clippy, tests,
-Rustdoc, the wasm build and verification, and a package build. It needs Rust 1.85+
-(with `rustfmt`, Clippy, and the `wasm32-unknown-unknown` target) and Node.js 22+.
-To verify the minimum supported Rust version, install 1.85.0 with the same target
-and run `node scripts/check.cjs --toolchain 1.85.0 --compatibility`.
+`node scripts/check.cjs` runs `fmt`, `clippy`, `test`, `doctest`, `doc`, `node`,
+`wasm`, and `package` in order. `doctest` tests documentation examples; `doc`
+generates documentation. `wasm` builds and verifies the example.
+Requires Rust 1.85+ (with `rustfmt`, Clippy, and the
+`wasm32-unknown-unknown` target) and Node.js 22+.
+
+```text
+node scripts/check.cjs --list
+node scripts/check.cjs --only wasm
+node scripts/check.cjs --skip doc --continue
+node scripts/check.cjs --toolchain 1.85.0 --compatibility
+```
+
+`--only`/`--skip` accept comma-separated names and repeated flags; `--list` only lists steps.
+Checks stop on the first failure by default. `--continue` runs remaining independent
+checks, summarizes failures, and returns a nonzero exit code if any failed.
+Cargo checks use `--locked`, permitting downloads without lockfile changes.
+`--toolchain` selects an installed Rust version; use 1.85.0 above to check MSRV.
+`--compatibility` skips `fmt` and `clippy`.
+
+CI's test job reuses this script. Dependency auditing (`cargo-deny`) and coverage
+remain separate CI jobs. A local run checks one platform and toolchain; CI also
+checks its Linux/Windows and MSRV matrix and uploads coverage reports.
 
 ## Releasing
 

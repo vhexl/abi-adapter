@@ -55,10 +55,28 @@ fn main() {
 
 ## 开发
 
-`node scripts/check.cjs` 执行完整的本地检查：格式、Clippy、测试、Rustdoc、wasm 构建与验证，以及打包。
-需要 Rust 1.85+（含 `rustfmt`、Clippy 和 `wasm32-unknown-unknown` 目标）与 Node.js 22+。
-验证最低支持版本时，安装带同一目标的 Rust 1.85.0，再运行
-`node scripts/check.cjs --toolchain 1.85.0 --compatibility`。
+`node scripts/check.cjs` 依次执行 `fmt`、`clippy`、`test`、`doctest`、`doc`、
+`node`、`wasm` 和 `package`。`doctest` 测试文档示例，`doc` 生成文档；
+`wasm` 包含示例构建与验证。需要 Rust 1.85+（含 `rustfmt`、Clippy 和
+`wasm32-unknown-unknown` 目标）与 Node.js 22+。
+
+```text
+node scripts/check.cjs --list
+node scripts/check.cjs --only wasm
+node scripts/check.cjs --skip doc --continue
+node scripts/check.cjs --toolchain 1.85.0 --compatibility
+```
+
+`--only`/`--skip` 接受逗号分隔的步骤名，也可重复指定；`--list` 仅列出步骤。
+默认遇到首个失败即退出；`--continue` 继续剩余独立检查，汇总失败，
+并在存在失败时返回非零退出码。
+Cargo 检查使用 `--locked`，允许下载依赖，但不允许更改锁文件。
+`--toolchain` 选择已安装的 Rust 版本；`--compatibility` 跳过 `fmt` 和 `clippy`。
+验证最低支持版本时，安装带 wasm 目标的 Rust 1.85.0，运行上面的对应命令。
+
+CI 的 test job 复用此脚本，依赖审计（`cargo-deny`）和覆盖率仍是独立 CI 任务。
+本地一次运行检查一个平台和工具链；CI 还检查 Linux/Windows 与 MSRV 矩阵，
+并上传覆盖率报告。
 
 ## 发布流程
 

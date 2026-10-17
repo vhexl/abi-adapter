@@ -90,26 +90,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
-      - name: Rust tests
-        run: cargo test --locked --all-targets
-
-      - name: Documentation examples
-        run: cargo test --locked --doc
-
-      - name: Documentation
-        run: cargo doc --locked --no-deps
-
-      - name: Node tests
-        run: node --test tests/*.cjs
-
-      - name: Wasm build
-        run: cargo build --locked --release --target wasm32-unknown-unknown --example guest
-
-      - name: Wasm verification
-        run: node examples/verify-wasm.cjs target/wasm32-unknown-unknown/release/examples/guest.wasm
-
-      - name: Package build
-        run: cargo package --locked --allow-dirty
+      - name: Run compatibility checks
+        run: node scripts/check.cjs --compatibility --continue
 
   # -- Coverage on stable (uploaded to Codecov) ----------------------
   coverage:
