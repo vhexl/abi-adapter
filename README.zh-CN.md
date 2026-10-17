@@ -74,9 +74,9 @@ Cargo 检查使用 `--locked`，允许下载依赖，但不允许更改锁文件
 `--toolchain` 选择已安装的 Rust 版本；`--compatibility` 跳过 `fmt` 和 `clippy`。
 验证最低支持版本时，安装带 wasm 目标的 Rust 1.85.0，运行上面的对应命令。
 
-CI 的 test job 复用此脚本，依赖审计（`cargo-deny`）和覆盖率仍是独立 CI 任务。
-本地一次运行检查一个平台和工具链；CI 还检查 Linux/Windows 与 MSRV 矩阵，
-并上传覆盖率报告。
+CI 的 Linux/Windows 测试矩阵和 MSRV job 复用此脚本，MSRV 从 `Cargo.toml`
+的 `rust-version` 读取。依赖审计（`cargo-deny`）和覆盖率仍是独立 CI 任务；
+每周的计划工作流还会检查 beta Rust 与新的安全公告。
 
 ## 发布流程
 
@@ -88,6 +88,9 @@ CI 的 test job 复用此脚本，依赖审计（`cargo-deny`）和覆盖率仍�
    - 创建 git 标签（`v<version>`）
    - 发布到 [crates.io](https://crates.io/crates/abi-adapter)
    - 创建 GitHub Release 及发布说明
+
+发布前会等待该合并提交的 push CI 成功。若 CI 失败后手动重新运行并成功，
+请同时手动重新运行 Release-plz 工作流，无需等待下一次 push。
 
 发布使用 crates.io 的 [Trusted Publishing](https://crates.io/docs/trusted-publishing)，不保存发布令牌；
 配置说明见 [release-plz.yml](.github/workflows/release-plz.yml)。

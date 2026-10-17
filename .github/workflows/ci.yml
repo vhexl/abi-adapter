@@ -10,9 +10,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # Never cancel runs on main so every merged commit keeps its result.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Cancel superseded PR runs. Push/manual runs get a unique group so every
+  # merged commit keeps its own result instead of waiting for an older run.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -40,16 +41,13 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-
       - name: Check formatting
         run: cargo fmt --all -- --check
 
       - name: Run clippy
         run: cargo clippy --locked --all-targets -- -D warnings
 
-  # -- Test matrix (stable on Linux + Windows, MSRV on Linux) --------
+  # -- Test matrix (stable on Linux + Windows) -----------------------
   test:
     name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
@@ -60,13 +58,8 @@ jobs:
         include:
           - name: stable / ubuntu
             os: ubuntu-latest
-            rust: stable
           - name: stable / windows
             os: windows-latest
-            rust: stable
-          - name: MSRV 1.85 / ubuntu
-            os: ubuntu-latest
-            rust: '1.85.0'
     env:
       RUSTDOCFLAGS: -D warnings
     steps:
@@ -81,10 +74,52 @@ jobs:
           node-version: '22'
           package-manager-cache: false
 
-      - name: Install Rust ${{ matrix.rust }}
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Run compatibility checks
+        run: node scripts/check.cjs --compatibility --continue
+
+  # -- MSRV build + test (version read from Cargo.toml) --------------
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read MSRV from Cargo.toml
+        id: msrv
+        run: |
+          version=$(cargo metadata --locked --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "abi-adapter") | .rust_version // empty')
+          if [ -z "$version" ]; then
+            echo "::error::Cargo.toml must declare a non-empty package.rust-version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install Rust (MSRV)
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
           targets: wasm32-unknown-unknown
 
       - name: Cache Rust dependencies
@@ -140,6 +175,7 @@ jobs:
 
       # Secrets are unavailable to PRs from forks and to Dependabot runs.
       - name: Upload coverage to Codecov
+        continue-on-error: true
         if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
@@ -167,7 +203,7 @@ jobs:
   ci-success:
     name: CI success
     if: ${{ always() }}
-    needs: [lint, test, coverage, deny]
+    needs: [lint, test, msrv, coverage, deny]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

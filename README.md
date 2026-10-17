@@ -80,9 +80,10 @@ Cargo checks use `--locked`, permitting downloads without lockfile changes.
 `--toolchain` selects an installed Rust version; use 1.85.0 above to check MSRV.
 `--compatibility` skips `fmt` and `clippy`.
 
-CI's test job reuses this script. Dependency auditing (`cargo-deny`) and coverage
-remain separate CI jobs. A local run checks one platform and toolchain; CI also
-checks its Linux/Windows and MSRV matrix and uploads coverage reports.
+CI reuses this script for the Linux/Windows test matrix and the MSRV job, whose
+version is read from `Cargo.toml`. Dependency auditing (`cargo-deny`) and
+coverage remain separate CI jobs; a weekly scheduled workflow also checks beta
+Rust and new advisories.
 
 ## Releasing
 
@@ -95,6 +96,10 @@ This project uses [release-plz](https://release-plz.dev/) to automate releases:
    - Create the git tag (`v<version>`)
    - Publish to [crates.io](https://crates.io/crates/abi-adapter)
    - Create a GitHub release with release notes
+
+Publishing waits for the push CI run on the merged commit to succeed. If that CI
+run is re-run manually after a failure, re-run the Release-plz workflow as well;
+no further push is required.
 
 Publishing uses crates.io [Trusted Publishing](https://crates.io/docs/trusted-publishing),
 so no registry token is stored; setup notes are in

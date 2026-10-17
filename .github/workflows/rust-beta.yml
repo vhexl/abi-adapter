@@ -2,8 +2,9 @@ name: Rust beta
 
 # Early warning for the next stable Rust release. tests/compile.rs matches
 # rustc diagnostics, so a new compiler is the most likely cause of breakage.
-# A red run is a signal to investigate, not a merge blocker: this workflow is
-# not part of the required CI checks.
+# Also re-checks dependency advisories weekly so they stay visible between
+# pushes. A red run is a signal to investigate, not a merge blocker: this
+# workflow is not part of the required CI checks.
 # Clippy is deliberately not run here: new beta lints report style, not
 # compatibility, and denying warnings would turn them into failures.
 
@@ -48,20 +49,20 @@ jobs:
           toolchain: beta
           targets: wasm32-unknown-unknown
 
-      - name: Rust tests
-        run: cargo test --locked --all-targets
+      - name: Run compatibility checks
+        run: node scripts/check.cjs --compatibility --continue
 
-      - name: Documentation examples
-        run: cargo test --locked --doc
+  # Keep advisories visible between pushes; beta failures must not skip it.
+  deny:
+    name: cargo-deny (weekly)
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'vhexl' }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Documentation
-        run: cargo doc --locked --no-deps
-
-      - name: Node tests
-        run: node --test tests/*.cjs
-
-      - name: Wasm build
-        run: cargo build --locked --release --target wasm32-unknown-unknown --example guest
-
-      - name: Wasm verification
-        run: node examples/verify-wasm.cjs target/wasm32-unknown-unknown/release/examples/guest.wasm
+      - name: Run cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1

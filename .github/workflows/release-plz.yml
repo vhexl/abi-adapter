@@ -12,10 +12,46 @@ on:
 permissions: {}
 
 jobs:
+  # Wait for the existing CI run; keep push for crates.io Trusted Publishing.
+  # If CI fails and is later re-run successfully, re-run this workflow manually.
+  wait-for-ci:
+    name: Wait for CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: ${{ github.repository_owner == 'vhexl' }}
+    permissions:
+      actions: read
+      checks: read # needed by gh run watch
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - name: Wait for successful push CI
+        run: |
+          run_id=
+          # ci.yml/main are intentionally coupled to the CI workflow definition.
+          # Treat transient gh/API errors like a missing run and retry.
+          for attempt in {1..30}; do
+            run_id=$(gh run list --repo "$GH_REPO" --workflow ci.yml --branch main --event push --commit "$RELEASE_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty') || run_id=
+            if [ -n "$run_id" ]; then
+              break
+            fi
+            sleep 5
+          done
+          if [ -z "$run_id" ]; then
+            echo "::error::No push CI run found for main commit $RELEASE_SHA."
+            exit 1
+          fi
+          gh run watch "$run_id" --repo "$GH_REPO" --interval 10 --exit-status
+
   # -- Publish to crates.io + create GitHub release ------------------
   release-plz-release:
     name: Release-plz release
+    needs: wait-for-ci
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: ${{ github.repository_owner == 'vhexl' }}
     permissions:
       contents: write # needed to create git tags
@@ -25,6 +61,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Keep the CI-validated revision even if main has advanced.
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -48,6 +86,7 @@ jobs:
   release-plz-pr:
     name: Release-plz PR
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: ${{ github.repository_owner == 'vhexl' }}
     permissions:
       contents: write # needed to push version bump branches
@@ -72,6 +111,6 @@ jobs:
         with:
           command: release-pr
         env:
-          # PRs opened with GITHUB_TOKEN do not trigger CI; set RELEASE_PLZ_TOKEN
-          # (a PAT or GitHub App token) to run the checks on release PRs.
+          # GITHUB_TOKEN-created/updated PRs need a maintainer to approve CI.
+          # Set RELEASE_PLZ_TOKEN (a PAT or GitHub App token) for automatic CI.
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
