@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/vhexl/abi-adapter/compare/v0.1.0...v0.1.1) - 2026-10-17
+
+### Other
+
+- add CI workflows, update documentation, and enhance project structure
+
 ## [0.1.0](https://github.com/vhexl/abi-adapter/releases/tag/v0.1.0) - 2026-10-16
 
 ### Added
