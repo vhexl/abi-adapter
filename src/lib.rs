@@ -8,8 +8,8 @@
 //! - [`FromSlots`]: decode business arguments.
 //! - [`IntoSlots`]: encode business results.
 //!
-//! Repository guides: `docs/guide.md` for usage and common problems,
-//! `docs/architecture.md` for design, and `docs/development.md` for checks.
+//! Repository guides: `docs/guide.md` for usage and common problems and
+//! `docs/architecture.md` for design.
 //!
 //! # Example
 //!

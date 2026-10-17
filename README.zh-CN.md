@@ -1,10 +1,11 @@
 # abi-adapter
 
-[![CI](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml)
-[![crates.io](https://img.shields.io/crates/v/abi-adapter)](https://crates.io/crates/abi-adapter)
+[![CI](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml/badge.svg)](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/vhexl/abi-adapter/branch/main/graph/badge.svg)](https://codecov.io/gh/vhexl/abi-adapter)
+[![crates.io](https://img.shields.io/crates/v/abi-adapter.svg)](https://crates.io/crates/abi-adapter)
 [![docs.rs](https://img.shields.io/docsrs/abi-adapter)](https://docs.rs/abi-adapter)
-[![MSRV](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvhexl%2Fabi-adapter%2Fmain%2FCargo.toml&query=%24.package.rust-version&label=MSRV&color=blue)](Cargo.toml)
-[![License](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvhexl%2Fabi-adapter%2Fmain%2FCargo.toml&query=%24.package.license&label=license&color=blue)](#许可证)
+[![MSRV](https://img.shields.io/crates/msrv/abi-adapter)](https://github.com/vhexl/abi-adapter/blob/main/Cargo.toml)
+[![License](https://img.shields.io/crates/l/abi-adapter.svg)](#许可证)
 
 [English](README.md) | 简体中文
 
@@ -51,8 +52,31 @@ fn main() {
 - [使用指南](docs/guide.md)：自定义转换、`ctx`、wasm 导出与常见问题。
 - [缓冲区示例](docs/buffers.md)：多槽结果与内存约定。
 - [架构设计](docs/architecture.md)：模块划分、执行流程与设计取舍。
-- [开发指南](docs/development.md)：检查、API 文档、发布与维护约定。
+
+## 开发
+
+`node scripts/check.cjs` 执行完整的本地检查：格式、Clippy、测试、Rustdoc、wasm 构建与验证，以及打包。
+需要 Rust 1.85+（含 `rustfmt`、Clippy 和 `wasm32-unknown-unknown` 目标）与 Node.js 22+。
+验证最低支持版本时，安装带同一目标的 Rust 1.85.0，再运行
+`node scripts/check.cjs --toolchain 1.85.0 --compatibility`。
+
+## 发布流程
+
+本项目使用 [release-plz](https://release-plz.dev/) 自动化发布：
+
+1. 每次推送到 `main` 分支，release-plz 会自动创建/更新一个 **Release PR**，
+   包含版本号与基于 [约定式提交](https://www.conventionalcommits.org/) 生成的更新日志。
+2. 合并 Release PR 后，release-plz 将自动：
+   - 创建 git 标签（`v<version>`）
+   - 发布到 [crates.io](https://crates.io/crates/abi-adapter)
+   - 创建 GitHub Release 及发布说明
+
+发布使用 crates.io 的 [Trusted Publishing](https://crates.io/docs/trusted-publishing)，不保存发布令牌；
+配置说明见 [release-plz.yml](.github/workflows/release-plz.yml)。
 
 ## 许可证
 
-[MIT](LICENSE-MIT) 或 [Apache-2.0](LICENSE-APACHE)，任选其一。
+你可以任选以下任一许可证：
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))

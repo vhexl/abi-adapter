@@ -1,6 +1,6 @@
 # 使用指南
 
-[文档首页](../README.zh-CN.md) · [架构设计](architecture.md) · [开发指南](development.md)
+[文档首页](../README.zh-CN.md) · [架构设计](architecture.md)
 
 `abi!` 将以 `u32` 为槽的接口转换为普通 Rust 函数调用。本页介绍常见用法和排错；
 完整声明规则见 [`abi!` API](../src/boundary.rs)，转换契约见 [转换 trait API](../src/slots.rs)。
@@ -110,7 +110,7 @@ cargo build --release --target wasm32-unknown-unknown
 导出名必须在最终产物中唯一，调用签名必须兼容；不能依赖链接器发现所有符号冲突。
 这些责任也适用于没有 `unsafe` 调用的 Rust 包装函数。
 
-可为同一业务函数声明多个版本的导出。本项目的 wasm 示例与验证命令见[开发指南](development.md)。
+可为同一业务函数声明多个版本的导出。本项目的 wasm 示例见 [examples/guest.rs](../examples/guest.rs)，其产物由 [examples/verify-wasm.cjs](../examples/verify-wasm.cjs) 验证。
 
 ## 约定调用方式
 

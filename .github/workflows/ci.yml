@@ -1,39 +1,197 @@
-name: Checks
+name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel runs on main so every merged commit keeps its result.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  check:
-    name: Rust ${{ matrix.rust }} / ${{ matrix.os }}
+  # -- Format + Clippy -----------------------------------------------
+  lint:
+    name: Format + Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+  # -- Test matrix (stable on Linux + Windows, MSRV on Linux) --------
+  test:
+    name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - name: stable / ubuntu
+            os: ubuntu-latest
             rust: stable
-            options: ''
-          - os: windows-latest
+          - name: stable / windows
+            os: windows-latest
             rust: stable
-            options: ''
-          - os: ubuntu-latest
+          - name: MSRV 1.85 / ubuntu
+            os: ubuntu-latest
             rust: '1.85.0'
-            options: --compatibility
+    env:
+      RUSTDOCFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
           package-manager-cache: false
-      - name: Install Rust
-        run: rustup toolchain install ${{ matrix.rust }} --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
-      - name: Run checks
-        run: node scripts/check.cjs --toolchain ${{ matrix.rust }} ${{ matrix.options }}
+
+      - name: Install Rust ${{ matrix.rust }}
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Rust tests
+        run: cargo test --locked --all-targets
+
+      - name: Documentation examples
+        run: cargo test --locked --doc
+
+      - name: Documentation
+        run: cargo doc --locked --no-deps
+
+      - name: Node tests
+        run: node --test tests/*.cjs
+
+      - name: Wasm build
+        run: cargo build --locked --release --target wasm32-unknown-unknown --example guest
+
+      - name: Wasm verification
+        run: node examples/verify-wasm.cjs target/wasm32-unknown-unknown/release/examples/guest.wasm
+
+      - name: Package build
+        run: cargo package --locked --allow-dirty
+
+  # -- Coverage on stable (uploaded to Codecov) ----------------------
+  coverage:
+    name: Coverage (stable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Run tests with coverage
+        run: cargo llvm-cov --locked --lcov --output-path lcov.info
+
+      - name: Verify lcov report
+        run: |
+          test -s lcov.info
+          grep -q '^SF:' lcov.info
+          grep -q '^DA:' lcov.info
+
+      - name: Normalize lcov paths for Codecov
+        run: |
+          sed -i "s#^SF:${GITHUB_WORKSPACE}/#SF:#" lcov.info
+          grep -q '^DA:' lcov.info
+          if grep -q "^SF:${GITHUB_WORKSPACE}/" lcov.info; then
+            echo "Found unresolved absolute SF paths in lcov.info"
+            exit 1
+          fi
+          echo "First SF entries after normalization:"
+          grep '^SF:' lcov.info | head -n 10
+
+      # Secrets are unavailable to PRs from forks and to Dependabot runs.
+      - name: Upload coverage to Codecov
+        if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: ./lcov.info
+          disable_search: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          verbose: true
+
+  # -- Dependency audit (advisories, licenses, sources) --------------
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+
+  # -- Single required check for branch protection -------------------
+  ci-success:
+    name: CI success
+    if: ${{ always() }}
+    needs: [lint, test, coverage, deny]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then
+            echo "One or more required jobs did not succeed"
+            exit 1
+          fi

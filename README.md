@@ -1,10 +1,11 @@
 # abi-adapter
 
-[![CI](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml)
-[![crates.io](https://img.shields.io/crates/v/abi-adapter)](https://crates.io/crates/abi-adapter)
+[![CI](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml/badge.svg)](https://github.com/vhexl/abi-adapter/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/vhexl/abi-adapter/branch/main/graph/badge.svg)](https://codecov.io/gh/vhexl/abi-adapter)
+[![crates.io](https://img.shields.io/crates/v/abi-adapter.svg)](https://crates.io/crates/abi-adapter)
 [![docs.rs](https://img.shields.io/docsrs/abi-adapter)](https://docs.rs/abi-adapter)
-[![MSRV](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvhexl%2Fabi-adapter%2Fmain%2FCargo.toml&query=%24.package.rust-version&label=MSRV&color=blue)](Cargo.toml)
-[![License](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvhexl%2Fabi-adapter%2Fmain%2FCargo.toml&query=%24.package.license&label=license&color=blue)](#license)
+[![MSRV](https://img.shields.io/crates/msrv/abi-adapter)](https://github.com/vhexl/abi-adapter/blob/main/Cargo.toml)
+[![License](https://img.shields.io/crates/l/abi-adapter.svg)](#license)
 
 English | [简体中文](README.zh-CN.md)
 
@@ -56,8 +57,36 @@ The following guides are in Chinese:
 - [Usage guide](docs/guide.md): custom conversions, `ctx`, wasm exports, and common problems.
 - [Buffer example](docs/buffers.md): multi-slot results and memory conventions.
 - [Architecture](docs/architecture.md): modules, execution flow, and design decisions.
-- [Development guide](docs/development.md): checks, API documentation, releases, and maintenance.
+
+## Development
+
+`node scripts/check.cjs` runs the full local check: formatting, Clippy, tests,
+Rustdoc, the wasm build and verification, and a package build. It needs Rust 1.85+
+(with `rustfmt`, Clippy, and the `wasm32-unknown-unknown` target) and Node.js 22+.
+To verify the minimum supported Rust version, install 1.85.0 with the same target
+and run `node scripts/check.cjs --toolchain 1.85.0 --compatibility`.
+
+## Releasing
+
+This project uses [release-plz](https://release-plz.dev/) to automate releases:
+
+1. Every push to `main` triggers release-plz to open/update a **Release PR**
+   with the correct version bumps and a changelog derived from
+   [Conventional Commits](https://www.conventionalcommits.org/).
+2. Merge the Release PR when ready — release-plz will then:
+   - Create the git tag (`v<version>`)
+   - Publish to [crates.io](https://crates.io/crates/abi-adapter)
+   - Create a GitHub release with release notes
+
+Publishing uses crates.io [Trusted Publishing](https://crates.io/docs/trusted-publishing),
+so no registry token is stored; setup notes are in
+[release-plz.yml](.github/workflows/release-plz.yml).
 
 ## License
 
-[MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.

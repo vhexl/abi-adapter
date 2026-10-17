@@ -1,13 +1,17 @@
 [package]
-name = "abi-adapter"
-version = "0.1.0"
-description = "Mechanical slot-based ABI adapter for wasm boundaries"
-license = "MIT OR Apache-2.0"
-edition = "2024"
+name         = "abi-adapter"
+version      = "0.1.0"
+edition      = "2024"
 rust-version = "1.85"
-repository = "https://github.com/vhexl/abi-adapter"
-readme = "README.md"
-include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/examples/**", "/docs/**", "/scripts/**", "/LICENSE*", "/README.md", "/README.zh-CN.md"]
+description  = "Mechanical slot-based ABI adapter for wasm boundaries"
+license      = "MIT OR Apache-2.0"
+repository   = "https://github.com/vhexl/abi-adapter"
+homepage     = "https://github.com/vhexl/abi-adapter"
+documentation = "https://docs.rs/abi-adapter"
+keywords     = ["wasm", "abi", "ffi", "no-std", "macro"]
+categories   = ["wasm", "no-std", "no-std::no-alloc", "development-tools::ffi"]
+readme       = "README.md"
+include      = ["/src/**", "/tests/**", "/examples/**", "/docs/**", "/scripts/**", "/LICENSE*", "/README.md", "/README.zh-CN.md", "/CHANGELOG.md"]
 
 [workspace]
 exclude = ["temp", "backup"]   # whole directories: frozen probes and history stay standalone
